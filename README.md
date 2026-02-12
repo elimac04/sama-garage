@@ -88,3 +88,4 @@ Pour toute question ou assistance, consultez la documentation dans le dossier `d
 ## 📄 Licence
 
 Propriétaire - SAMA GARAGE © 2025
+# sama-garage
