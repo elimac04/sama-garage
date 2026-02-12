@@ -1,0 +1,314 @@
+import { useState, useMemo } from 'react';
+import { DollarSign, TrendingUp, FileText, Calendar, CheckCircle, Clock, Smartphone, Wallet, AlertCircle, Eye, Receipt } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, Input, Select } from '@/components/ui';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { useInterventionsStore } from '@/stores/interventionsStore';
+import { useToast } from '@/stores/toastStore';
+
+interface Payment {
+  id: string;
+  amount: number;
+  method: 'cash' | 'wave' | 'orange_money';
+  date: string;
+}
+
+const FinancePage = () => {
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedIntervention, setSelectedIntervention] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'wave' | 'orange_money'>('cash');
+  
+  const { interventions, updateIntervention } = useInterventionsStore();
+  const toast = useToast();
+
+  // Données mockées
+  const invoices: Invoice[] = [
+    {
+      id: '1',
+      invoice_number: 'INV-2025-001',
+      intervention: {
+        vehicle: 'Toyota Corolla',
+        registration: 'DK-1234-AB'
+      },
+      total_amount: 45000,
+      status: 'paid',
+      issued_date: '2025-11-30',
+      paid_date: '2025-11-30',
+      payment_method: 'wave'
+    },
+    {
+      id: '2',
+      invoice_number: 'INV-2025-002',
+      intervention: {
+        vehicle: 'Peugeot 208',
+        registration: 'DK-5678-CD'
+      },
+      total_amount: 75000,
+      status: 'pending',
+      issued_date: '2025-12-01'
+    },
+    {
+      id: '3',
+      invoice_number: 'INV-2025-003',
+      intervention: {
+        vehicle: 'Renault Clio',
+        registration: 'DK-9012-EF'
+      },
+      total_amount: 30000,
+      status: 'paid',
+      issued_date: '2025-11-28',
+      paid_date: '2025-11-29',
+      payment_method: 'cash'
+    },
+  ];
+
+  const filteredInvoices = filterStatus === 'all' 
+    ? invoices 
+    : invoices.filter(i => i.status === filterStatus);
+
+  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total_amount, 0);
+  const totalPending = invoices.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.total_amount, 0);
+  const totalRevenue = totalPaid;
+
+  const paymentMethodIcons = {
+    cash: Wallet,
+    wave: Smartphone,
+    orange_money: Smartphone,
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Finance</h1>
+          <p className="text-gray-600 mt-1">Facturation et rapports financiers</p>
+        </div>
+        <Button onClick={() => setShowModal(true)} className="flex items-center gap-2">
+          <Plus className="h-5 w-5" />
+          Nouvelle facture
+        </Button>
+      </div>
+
+      {/* Stats financières */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Factures payées</p>
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {invoices.filter(i => i.status === 'paid').length} facture(s)
+                </p>
+              </div>
+              <div className="bg-green-500 p-3 rounded-xl">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Factures en attente</p>
+                <p className="text-2xl font-bold text-orange-600">{formatCurrency(totalPending)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {invoices.filter(i => i.status === 'pending').length} facture(s)
+                </p>
+              </div>
+              <div className="bg-orange-500 p-3 rounded-xl">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Chiffre d'affaires</p>
+                <p className="text-2xl font-bold text-primary-600">{formatCurrency(totalRevenue)}</p>
+                <p className="text-xs text-gray-500 mt-1">Ce mois</p>
+              </div>
+              <div className="bg-primary-500 p-3 rounded-xl">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filtres */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Filtrer par statut:</span>
+            {[
+              { value: 'all', label: 'Toutes' },
+              { value: 'paid', label: 'Payées' },
+              { value: 'pending', label: 'En attente' },
+            ].map((filter) => (
+              <Button
+                key={filter.value}
+                size="sm"
+                variant={filterStatus === filter.value ? 'primary' : 'secondary'}
+                onClick={() => setFilterStatus(filter.value)}
+              >
+                {filter.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Liste des factures */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Factures</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {filteredInvoices.map((invoice) => {
+              const PaymentIcon = invoice.payment_method ? paymentMethodIcons[invoice.payment_method] : null;
+              
+              return (
+                <div 
+                  key={invoice.id}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    {/* Icône et informations */}
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        invoice.status === 'paid' ? 'bg-green-100' :
+                        invoice.status === 'pending' ? 'bg-orange-100' : 'bg-gray-100'
+                      }`}>
+                        <FileText className={`h-6 w-6 ${
+                          invoice.status === 'paid' ? 'text-green-600' :
+                          invoice.status === 'pending' ? 'text-orange-600' : 'text-gray-600'
+                        }`} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <h3 className="font-semibold text-gray-900">
+                              {invoice.invoice_number}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {invoice.intervention.vehicle} - {invoice.intervention.registration}
+                            </p>
+                          </div>
+                          <Badge 
+                            variant={invoice.status === 'paid' ? 'success' : 'warning'}
+                          >
+                            {getStatusLabel(invoice.status)}
+                          </Badge>
+                        </div>
+
+                        {/* Détails */}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mt-3">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{formatDate(invoice.issued_date)}</span>
+                          </div>
+                          {invoice.paid_date && (
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="h-4 w-4" />
+                              <span>Payé le {formatDate(invoice.paid_date)}</span>
+                            </div>
+                          )}
+                          {invoice.payment_method && PaymentIcon && (
+                            <div className="flex items-center gap-1">
+                              <PaymentIcon className="h-4 w-4" />
+                              <span>{getStatusLabel(invoice.payment_method)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Montant et actions */}
+                    <div className="flex items-center gap-4 lg:flex-col lg:items-end">
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-gray-900">
+                          {formatCurrency(invoice.total_amount)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="ghost">
+                          Voir
+                        </Button>
+                        {invoice.status === 'pending' && (
+                          <Button size="sm">
+                            Encaisser
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Modal de création de facture */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Nouvelle facture"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              Annuler
+            </Button>
+            <Button onClick={() => setShowModal(false)}>
+              Créer la facture
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label="Intervention"
+            options={[
+              { value: '', label: 'Sélectionner une intervention' },
+              { value: '1', label: 'Toyota Corolla - DK-1234-AB - Vidange' },
+              { value: '2', label: 'Peugeot 208 - DK-5678-CD - Freinage' },
+            ]}
+            required
+          />
+
+          <Input
+            label="Montant total (FCFA)"
+            type="number"
+            placeholder="45000"
+            required
+          />
+
+          <Input
+            label="Description (optionnel)"
+            placeholder="Détails de la facture..."
+          />
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-900">
+              💡 <strong>Astuce:</strong> La facture sera automatiquement numérotée (INV-2025-XXX)
+            </p>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default FinancePage;

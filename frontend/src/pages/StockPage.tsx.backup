@@ -1,0 +1,303 @@
+import { useState, useRef, useEffect } from 'react';
+import { Package, Plus, AlertTriangle, Edit2, Trash2, TrendingDown, TrendingUp, Camera, Mic, MicOff, X, Image as ImageIcon, Eye, Play } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Modal, Badge, Select } from '@/components/ui';
+import { formatCurrency } from '@/lib/utils';
+import { useStockStore, StockArticle } from '@/stores/stockStore';
+import { stockCategories } from '@/data/stockData';
+import { useToast } from '@/stores/toastStore';
+
+const StockPage = () => {
+  const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState<StockArticle | null>(null);
+  const [editingArticle, setEditingArticle] = useState<StockArticle | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  
+  // Formulaire
+  const [formData, setFormData] = useState({
+    name: '',
+    reference: '',
+    category: '',
+    quantity: '',
+    unit_price: '',
+    alert_threshold: ''
+  });
+  
+  // Photos et Audio
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string>('');
+  const [showCamera, setShowCamera] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const toast = useToast();
+  
+  const { articles, addArticle, updateArticle: updateArticleInStore, deleteArticle: deleteArticleFromStore } = useStockStore();
+
+  // Filtrer les articles
+  const filteredArticles = articles.filter(article => {
+    const matchesSearch = searchQuery === '' ||
+      article.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      article.reference.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = filterCategory === '' || article.category === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const lowStockItems = articles.filter(item => item.quantity <= item.alert_threshold);
+  const totalValue = articles.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Stock</h1>
+          <p className="text-gray-600 mt-1">Gérer les pièces et articles en stock</p>
+        </div>
+        <Button onClick={() => setShowModal(true)} className="flex items-center gap-2">
+          <Plus className="h-5 w-5" />
+          Nouvel article
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Articles en stock</p>
+                <p className="text-2xl font-bold text-gray-900">{stockItems.length}</p>
+              </div>
+              <div className="bg-blue-500 p-3 rounded-xl">
+                <Package className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Valeur totale</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalValue)}</p>
+              </div>
+              <div className="bg-green-500 p-3 rounded-xl">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Alertes de stock</p>
+                <p className="text-2xl font-bold text-red-600">{lowStockItems.length}</p>
+              </div>
+              <div className="bg-red-500 p-3 rounded-xl">
+                <AlertTriangle className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Alertes de stock faible */}
+      {lowStockItems.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Alertes de stock faible ({lowStockItems.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {lowStockItems.map((item) => (
+                <div key={item.id} className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h4 className="font-semibold text-gray-900">{item.name}</h4>
+                      <p className="text-sm text-gray-600">{item.reference}</p>
+                    </div>
+                    <Badge variant="danger">Stock faible</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm mt-3">
+                    <span className="text-gray-600">
+                      Quantité: <span className="font-bold text-red-600">{item.quantity}</span>
+                    </span>
+                    <span className="text-gray-500">Seuil: {item.alert_threshold}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Liste des articles */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tous les articles</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Article
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Référence
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Catégorie
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Quantité
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Prix unitaire
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valeur totale
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stockItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          item.quantity <= item.alert_threshold ? 'bg-red-100' : 'bg-green-100'
+                        }`}>
+                          <Package className={`h-5 w-5 ${
+                            item.quantity <= item.alert_threshold ? 'text-red-600' : 'text-green-600'
+                          }`} />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{item.name}</p>
+                          {item.quantity <= item.alert_threshold && (
+                            <div className="flex items-center gap-1 text-xs text-red-600">
+                              <TrendingDown className="h-3 w-3" />
+                              Stock faible
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="font-mono text-sm text-gray-600">{item.reference}</span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <Badge variant="default">{item.category}</Badge>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <span className={`font-semibold ${
+                        item.quantity <= item.alert_threshold ? 'text-red-600' : 'text-gray-900'
+                      }`}>
+                        {item.quantity}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-gray-900">
+                      {formatCurrency(item.unit_price)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right font-semibold text-gray-900">
+                      {formatCurrency(item.quantity * item.unit_price)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button size="sm" variant="ghost">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Modal d'ajout */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Nouvel article"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              Annuler
+            </Button>
+            <Button onClick={() => setShowModal(false)}>
+              Enregistrer
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Nom de l'article"
+            placeholder="Huile moteur 5W40"
+            required
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Référence"
+              placeholder="HM-5W40-001"
+              required
+            />
+            <Input
+              label="Catégorie"
+              placeholder="Lubrifiants"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="Quantité"
+              type="number"
+              placeholder="10"
+              required
+            />
+            <Input
+              label="Prix unitaire (FCFA)"
+              type="number"
+              placeholder="8500"
+              required
+            />
+            <Input
+              label="Seuil d'alerte"
+              type="number"
+              placeholder="5"
+              required
+            />
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default StockPage;
