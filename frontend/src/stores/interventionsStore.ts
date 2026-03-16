@@ -54,7 +54,47 @@ const mapTypeFromApi = (type: string): Intervention['type'] => {
   }
 };
 
-const mapApiIntervention = (i: any): Intervention => ({
+interface ApiIntervention {
+  id: string;
+  vehicle_id: string;
+  vehicle?: {
+    brand: string;
+    model: string;
+    registration_number: string;
+    owner?: {
+      full_name: string;
+      phone: string;
+    };
+  };
+  description: string;
+  type: string;
+  mechanic_id?: string;
+  mechanic?: {
+    full_name: string;
+  };
+  estimated_cost?: number;
+  final_cost?: number;
+  advance_payment?: number;
+  remaining_amount?: number;
+  stock_items?: Array<{
+    id: string;
+    stock_item_id: string;
+    stock_item?: {
+      name: string;
+      photos?: string[];
+    };
+    quantity_used: number;
+    unit_price_at_time: number;
+  }>;
+  status: 'pending' | 'in_progress' | 'completed';
+  diagnostic_result?: string;
+  diagnostic_result_name?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+const mapApiIntervention = (i: ApiIntervention): Intervention => ({
   id: i.id,
   vehicleId: i.vehicle_id,
   vehicle: i.vehicle ? `${i.vehicle.brand} ${i.vehicle.model}` : '',

@@ -14,9 +14,15 @@ const AgentDashboard = () => {
   const { articles, loading: stockLoading, fetchArticles } = useStockStore();
 
   useEffect(() => {
-    fetchVehicles().catch(() => {});
-    fetchInterventions().catch(() => {});
-    fetchArticles().catch(() => {});
+    fetchVehicles().catch((error) => {
+      console.error('Erreur chargement véhicules:', error);
+    });
+    fetchInterventions().catch((error) => {
+      console.error('Erreur chargement interventions:', error);
+    });
+    fetchArticles().catch((error) => {
+      console.error('Erreur chargement articles:', error);
+    });
   }, [fetchVehicles, fetchInterventions, fetchArticles]);
 
   const loading = vehiclesLoading || interventionsLoading || stockLoading;
@@ -47,7 +53,7 @@ const AgentDashboard = () => {
     const completedInterventions = myInterventions.filter(i => i.status === 'completed');
     const pendingInterventions = myInterventions.filter(i => i.status === 'pending');
 
-    const lowStockItems = articles.filter((item: any) => item.quantity <= item.alert_threshold);
+    const lowStockItems = articles.filter((item) => item.quantity <= item.alert_threshold);
 
     return {
       totalVehicles: vehicles.length,
