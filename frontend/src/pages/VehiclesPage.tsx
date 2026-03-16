@@ -208,7 +208,13 @@ const VehiclesPage = () => {
         // Convertir en base64 pour stockage en base
         const reader = new FileReader();
         reader.onloadend = () => {
-          setAudioBase64(reader.result as string);
+          const base64String = reader.result as string;
+          setAudioBase64(base64String);
+          console.log('✅ Audio converti en base64:', base64String.substring(0, 100) + '...');
+        };
+        reader.onerror = (error) => {
+          console.error('❌ Erreur conversion audio:', error);
+          toast.error('Erreur lors de la conversion audio');
         };
         reader.readAsDataURL(blob);
         stream.getTracks().forEach(track => track.stop());
@@ -353,6 +359,7 @@ const VehiclesPage = () => {
     
     try {
       if (editingVehicle) {
+        console.log('📝 Modification véhicule avec audio:', audioBase64 ? 'OUI (' + audioBase64.substring(0, 50) + '...)' : 'NON');
         await updateVehicle(editingVehicle.id, {
           registration_number: formData.registration_number,
           brand: formData.brand,
@@ -368,6 +375,7 @@ const VehiclesPage = () => {
         });
         toast.success('Véhicule modifié avec succès !');
       } else {
+        console.log('📝 Création véhicule avec audio:', audioBase64 ? 'OUI (' + audioBase64.substring(0, 50) + '...)' : 'NON');
         await createVehicle({
           registration_number: formData.registration_number,
           brand: formData.brand,
