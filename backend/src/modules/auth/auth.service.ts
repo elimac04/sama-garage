@@ -29,7 +29,7 @@ export class AuthService {
       .from('users')
       .select('email')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (existingUser) {
       throw new BadRequestException('Cet email est déjà utilisé');
@@ -334,7 +334,7 @@ export class AuthService {
       .from('users')
       .select('email')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (existingUser) {
       throw new BadRequestException('Cet email est déjà utilisé');
@@ -447,7 +447,7 @@ export class AuthService {
         .select('id')
         .eq('email', updateDto.email)
         .neq('id', agentId)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         throw new BadRequestException('Cet email est déjà utilisé par un autre utilisateur');
