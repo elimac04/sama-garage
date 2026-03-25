@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, Plus, Edit2, Trash2, Eye, Search, UserCheck, UserX, Phone, Mail, Loader2 } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Eye, Search, UserCheck, UserX, Phone, Mail, Loader2, Copy, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, Button, Badge, Modal, Input, Select } from '@/components/ui';
 import { useAgentsStore, Agent } from '@/stores/agentsStore';
 import { useToast } from '@/stores/toastStore';
@@ -11,6 +11,9 @@ const AgentsPage = () => {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string; name: string; emailSent: boolean } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -79,13 +82,26 @@ const AgentsPage = () => {
         toast.success('Agent mis à jour avec succès');
       } else {
         // Création via API backend
-        await createAgent({
+        const result = await createAgent({
           email: formData.email,
           full_name: formData.name,
           phone: formData.phone || undefined,
           role: formData.role,
         });
-        toast.success('Agent créé avec succès ! Les identifiants ont été envoyés par email.');
+        handleCloseModal();
+        // Afficher les identifiants dans un modal
+        if (result.generatedPassword) {
+          setCreatedCredentials({
+            email: formData.email,
+            password: result.generatedPassword,
+            name: formData.name,
+            emailSent: result.emailSent ?? false,
+          });
+          setShowCredentialsModal(true);
+        } else {
+          toast.success('Agent créé avec succès !');
+        }
+        return;
       }
       handleCloseModal();
     } catch (error: any) {
@@ -454,6 +470,91 @@ const AgentsPage = () => {
                 Désactiver
               </Button>
             </div>
+          </div>
+        </Modal>
+      )}
+      {/* Modal Identifiants Générés */}
+      {showCredentialsModal && createdCredentials && (
+        <Modal
+          isOpen={showCredentialsModal}
+          onClose={() => {
+            setShowCredentialsModal(false);
+            setCreatedCredentials(null);
+            setCopiedField(null);
+          }}
+          title="Identifiants de l'agent créé"
+          size="lg"
+        >
+          <div className="space-y-4">
+            {/* Statut email */}
+            {createdCredentials.emailSent ? (
+              <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-green-800">Email envoyé avec succès</p>
+                  <p className="text-sm text-green-600">Les identifiants ont été envoyés à {createdCredentials.email}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800">Email non envoyé</p>
+                  <p className="text-sm text-amber-600">Veuillez communiquer ces identifiants manuellement à l'agent.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Identifiants */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 space-y-4">
+              <h4 className="font-semibold text-gray-900">Identifiants de connexion pour {createdCredentials.name}</h4>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-gray-500 block mb-1">Email</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm font-mono">
+                      {createdCredentials.email}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdCredentials.email);
+                        setCopiedField('email');
+                        setTimeout(() => setCopiedField(null), 2000);
+                      }}
+                    >
+                      {copiedField === 'email' ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-500 block mb-1">Mot de passe</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm font-mono font-bold text-blue-700">
+                      {createdCredentials.password}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdCredentials.password);
+                        setCopiedField('password');
+                        setTimeout(() => setCopiedField(null), 2000);
+                      }}
+                    >
+                      {copiedField === 'password' ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400 text-center">
+              ⚠️ Ce mot de passe ne sera plus affiché après fermeture. Notez-le ou copiez-le maintenant.
+            </p>
           </div>
         </Modal>
       )}

@@ -17,7 +17,7 @@ interface AgentsStore {
   loading: boolean;
   fetchAgents: () => Promise<void>;
   addAgent: (agent: Agent) => void;
-  createAgent: (data: { email: string; full_name: string; role: 'mechanic' | 'cashier'; phone?: string }) => Promise<Agent>;
+  createAgent: (data: { email: string; full_name: string; role: 'mechanic' | 'cashier'; phone?: string }) => Promise<{ agent: Agent; generatedPassword?: string; emailSent?: boolean }>;
   updateAgent: (id: string, data: { full_name?: string; email?: string; phone?: string; role?: 'mechanic' | 'cashier' }) => Promise<Agent>;
   deleteAgent: (id: string) => Promise<void>;
   getAgent: (id: string) => Agent | undefined;
@@ -66,7 +66,11 @@ export const useAgentsStore = create<AgentsStore>()(
         agents: [agent, ...state.agents]
       }));
       window.dispatchEvent(new Event('agentsUpdated'));
-      return agent;
+      return {
+        agent,
+        generatedPassword: response.generatedPassword,
+        emailSent: response.emailSent,
+      };
     },
     
     updateAgent: async (id, data) => {

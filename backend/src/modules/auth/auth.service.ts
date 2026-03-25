@@ -367,7 +367,7 @@ export class AuthService {
     }
 
     // Envoyer les identifiants par email à l'agent
-    await this.emailService.sendWelcomeEmail(
+    const emailResult = await this.emailService.sendWelcomeEmail(
       email,
       full_name,
       role,
@@ -375,8 +375,12 @@ export class AuthService {
     );
 
     return {
-      message: 'Agent créé avec succès. Les identifiants ont été envoyés par email.',
+      message: emailResult.sent 
+        ? 'Agent créé avec succès. Les identifiants ont été envoyés par email.'
+        : 'Agent créé avec succès. ⚠️ L\'email n\'a pas pu être envoyé — veuillez communiquer les identifiants manuellement.',
       user: user[0],
+      generatedPassword,
+      emailSent: emailResult.sent,
     };
   }
 
