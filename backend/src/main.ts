@@ -1,3 +1,7 @@
+import * as dns from 'dns';
+// Forcer IPv4 en priorité (Railway IPv6 bloque Gmail SMTP)
+dns.setDefaultResultOrder('ipv4first');
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
