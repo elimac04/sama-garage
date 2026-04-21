@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 @Injectable()
 export class EmailService {
@@ -13,15 +14,28 @@ export class EmailService {
     this.fromEmail = this.configService.get('SMTP_FROM') || this.configService.get('SMTP_USER') || 'noreply@samagarage.sn';
     this.frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:5173';
 
-    this.transporter = nodemailer.createTransport({
+    const smtpUser = this.configService.get('SMTP_USER');
+    const smtpPass = this.configService.get('SMTP_PASS');
+
+    const smtpOptions: SMTPTransport.Options & { family?: number } = {
       host: this.configService.get('SMTP_HOST') || 'smtp.gmail.com',
       port: parseInt(this.configService.get('SMTP_PORT') || '587'),
       secure: false,
+      family: 4, // Forcer IPv4 (Railway IPv6 bloque Gmail)
+      connectionTimeout: 5000, // 5s max pour se connecter
+      greetingTimeout: 5000,
+      socketTimeout: 10000, // 10s max pour envoyer
       auth: {
-        user: this.configService.get('SMTP_USER'),
-        pass: this.configService.get('SMTP_PASS'),
+        user: smtpUser,
+        pass: smtpPass,
       },
-    });
+    };
+    this.transporter = nodemailer.createTransport(smtpOptions);
+
+    if (!smtpUser || !smtpPass) {
+      this.logger.warn('⚠️ SMTP_USER ou SMTP_PASS non configurés. Les emails seront loggés en console.');
+      return;
+    }
 
     // Vérifier la connexion SMTP au démarrage
     this.transporter.verify().then(() => {

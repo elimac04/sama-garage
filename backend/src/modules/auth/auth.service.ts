@@ -369,21 +369,28 @@ export class AuthService {
       throw new BadRequestException(`Erreur lors de la création de l'agent: ${dbError.message}`);
     }
 
-    // Envoyer les identifiants par email à l'agent
-    const emailResult = await this.emailService.sendWelcomeEmail(
+    // Envoyer les identifiants par email à l'agent (non-bloquant)
+    // On n'attend pas l'envoi pour ne pas bloquer la réponse API
+    this.emailService.sendWelcomeEmail(
       email,
       full_name,
       role,
       generatedPassword,
-    );
+    ).then((result) => {
+      if (result.sent) {
+        console.log(`✅ Email envoyé à ${email}`);
+      } else {
+        console.log(`⚠️ Email non envoyé à ${email} — identifiants affichés dans le modal`);
+      }
+    }).catch((err) => {
+      console.error(`❌ Erreur envoi email à ${email}:`, err.message);
+    });
 
     return {
-      message: emailResult.sent 
-        ? 'Agent créé avec succès. Les identifiants ont été envoyés par email.'
-        : 'Agent créé avec succès. ⚠️ L\'email n\'a pas pu être envoyé — veuillez communiquer les identifiants manuellement.',
+      message: 'Agent créé avec succès.',
       user: user[0],
       generatedPassword,
-      emailSent: emailResult.sent,
+      emailSent: false, // sera mis à jour côté logs
     };
   }
 
