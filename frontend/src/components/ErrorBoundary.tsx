@@ -54,11 +54,16 @@ class ErrorBoundary extends Component<Props, State> {
             <p className="text-gray-600 mb-6">
               L'application a rencontré un problème inattendu. Veuillez réessayer.
             </p>
-            {import.meta.env.DEV && this.state.error && (
+            {this.state.error && (
               <div className="mb-4 p-3 bg-red-50 rounded-lg text-left">
                 <p className="text-xs font-mono text-red-800 break-all">
                   {this.state.error.message}
                 </p>
+                {this.state.errorInfo?.componentStack && (
+                  <p className="text-xs font-mono text-red-600 break-all mt-2 max-h-32 overflow-auto">
+                    {this.state.errorInfo.componentStack.slice(0, 500)}
+                  </p>
+                )}
               </div>
             )}
             <div className="flex gap-3 justify-center">

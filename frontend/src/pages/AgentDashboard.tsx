@@ -13,6 +13,11 @@ const AgentDashboard = () => {
   const { interventions, loading: interventionsLoading, fetchInterventions } = useInterventionsStore();
   const { articles, loading: stockLoading, fetchArticles } = useStockStore();
 
+  // Protection: s'assurer que les tableaux sont bien des tableaux
+  const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
+  const safeInterventions = Array.isArray(interventions) ? interventions : [];
+  const safeArticles = Array.isArray(articles) ? articles : [];
+
   useEffect(() => {
     fetchVehicles().catch((error) => {
       console.error('Erreur chargement véhicules:', error);
@@ -27,7 +32,7 @@ const AgentDashboard = () => {
 
   const loading = vehiclesLoading || interventionsLoading || stockLoading;
 
-  if (loading && vehicles.length === 0 && interventions.length === 0 && articles.length === 0) {
+  if (loading && safeVehicles.length === 0 && safeInterventions.length === 0 && safeArticles.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
@@ -40,24 +45,24 @@ const AgentDashboard = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todayInterventions = interventions.filter(i => {
-      const interventionDate = new Date(i.createdAt);
-      const interventionDay = new Date(interventionDate);
-      interventionDay.setHours(0, 0, 0, 0);
-      return interventionDay.getTime() === today.getTime();
+    const todayInterventions = safeInterventions.filter(i => {
+      try {
+        const interventionDate = new Date(i.createdAt);
+        const interventionDay = new Date(interventionDate);
+        interventionDay.setHours(0, 0, 0, 0);
+        return interventionDay.getTime() === today.getTime();
+      } catch { return false; }
     });
 
-    const myInterventions = interventions; // Simplifié pour éviter les erreurs de types
+    const inProgressInterventions = safeInterventions.filter(i => i.status === 'in_progress');
+    const completedInterventions = safeInterventions.filter(i => i.status === 'completed');
+    const pendingInterventions = safeInterventions.filter(i => i.status === 'pending');
 
-    const inProgressInterventions = myInterventions.filter(i => i.status === 'in_progress');
-    const completedInterventions = myInterventions.filter(i => i.status === 'completed');
-    const pendingInterventions = myInterventions.filter(i => i.status === 'pending');
-
-    const lowStockItems = articles.filter((item) => item.quantity <= item.alert_threshold);
+    const lowStockItems = safeArticles.filter((item) => (item.quantity ?? 0) <= (item.alert_threshold ?? 0));
 
     return {
-      totalVehicles: vehicles.length,
-      totalInterventions: myInterventions.length,
+      totalVehicles: safeVehicles.length,
+      totalInterventions: safeInterventions.length,
       todayInterventions: todayInterventions.length,
       inProgressInterventions: inProgressInterventions.length,
       completedInterventions: completedInterventions.length,
@@ -66,16 +71,14 @@ const AgentDashboard = () => {
       todayRevenue: 0, // Simplifié pour éviter les erreurs de types
       pendingRevenue: 0, // Simplifié pour éviter les erreurs de types
     };
-  }, [vehicles, interventions, articles, user]);
+  }, [safeVehicles, safeInterventions, safeArticles, user]);
 
   // Interventions récentes pour l'agent
   const recentInterventions = useMemo(() => {
-    const myInterventions = interventions; // Simplifié pour éviter les erreurs de types
-
-    return myInterventions
+    return [...safeInterventions]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
-  }, [interventions, user]);
+  }, [safeInterventions]);
 
   const getRoleTitle = () => {
     switch (user?.role) {
