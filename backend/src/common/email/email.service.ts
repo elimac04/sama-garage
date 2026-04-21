@@ -1,51 +1,71 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import * as dns from 'dns';
+import { promisify } from 'util';
+
+const dnsLookup = promisify(dns.lookup);
 
 @Injectable()
-export class EmailService {
-  private transporter: nodemailer.Transporter;
+export class EmailService implements OnModuleInit {
+  private transporter: nodemailer.Transporter | null = null;
   private readonly logger = new Logger(EmailService.name);
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
+  private readonly smtpUser: string | undefined;
+  private readonly smtpPass: string | undefined;
+  private readonly smtpHost: string;
+  private readonly smtpPort: number;
 
   constructor(private configService: ConfigService) {
     this.fromEmail = this.configService.get('SMTP_FROM') || this.configService.get('SMTP_USER') || 'noreply@samagarage.sn';
     this.frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:5173';
+    this.smtpUser = this.configService.get('SMTP_USER');
+    this.smtpPass = this.configService.get('SMTP_PASS');
+    this.smtpHost = this.configService.get('SMTP_HOST') || 'smtp.gmail.com';
+    this.smtpPort = parseInt(this.configService.get('SMTP_PORT') || '587');
+  }
 
-    const smtpUser = this.configService.get('SMTP_USER');
-    const smtpPass = this.configService.get('SMTP_PASS');
-
-    const smtpOptions: SMTPTransport.Options & { family?: number } = {
-      host: this.configService.get('SMTP_HOST') || 'smtp.gmail.com',
-      port: parseInt(this.configService.get('SMTP_PORT') || '587'),
-      secure: false,
-      family: 4, // Forcer IPv4 (Railway IPv6 bloque Gmail)
-      connectionTimeout: 5000, // 5s max pour se connecter
-      greetingTimeout: 5000,
-      socketTimeout: 10000, // 10s max pour envoyer
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    };
-    this.transporter = nodemailer.createTransport(smtpOptions);
-
-    if (!smtpUser || !smtpPass) {
+  async onModuleInit() {
+    if (!this.smtpUser || !this.smtpPass) {
       this.logger.warn('⚠️ SMTP_USER ou SMTP_PASS non configurés. Les emails seront loggés en console.');
       return;
     }
 
-    // Vérifier la connexion SMTP au démarrage
-    this.transporter.verify().then(() => {
+    try {
+      // Résoudre le hostname en IPv4 explicitement (Railway IPv6 bloque Gmail)
+      const { address } = await dnsLookup(this.smtpHost, { family: 4 });
+      this.logger.log(`🌐 SMTP résolu: ${this.smtpHost} → ${address} (IPv4)`);
+
+      this.transporter = nodemailer.createTransport({
+        host: address,
+        port: this.smtpPort,
+        secure: false,
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000,
+        tls: {
+          servername: this.smtpHost, // Pour la validation TLS du certificat
+        },
+        auth: {
+          user: this.smtpUser,
+          pass: this.smtpPass,
+        },
+      } as nodemailer.TransportOptions);
+
+      await this.transporter.verify();
       this.logger.log('✅ Connexion SMTP établie avec succès');
-    }).catch((err) => {
+    } catch (err) {
       this.logger.warn(`⚠️ SMTP non configuré ou inaccessible: ${err.message}. Les emails seront loggés en console.`);
-    });
+      this.transporter = null;
+    }
   }
 
   private async sendMail(to: string, subject: string, html: string): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.warn(`⚠️ SMTP non disponible. Email à ${to} non envoyé.`);
+      return false;
+    }
     try {
       await this.transporter.sendMail({
         from: `"SAMA GARAGE" <${this.fromEmail}>`,
