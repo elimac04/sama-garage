@@ -326,15 +326,18 @@ export class AuthService {
   }
 
   async createAgent(createAgentDto: CreateAgentDto, tenantId: string) {
-    const { email, full_name, phone, role } = createAgentDto;
+    const { full_name, phone, role } = createAgentDto;
+    const email = createAgentDto.email.trim().toLowerCase();
 
     // Vérifier si l'email existe déjà
-    const { data: existingUser } = await this.supabaseService
+    const { data: existingUser, error: checkError } = await this.supabaseService
       .getAdminClient()
       .from('users')
       .select('email')
       .eq('email', email)
       .maybeSingle();
+
+    console.log(`🔍 createAgent - Vérification email "${email}":`, JSON.stringify({ existingUser, checkError: checkError?.message || null }));
 
     if (existingUser) {
       throw new BadRequestException('Cet email est déjà utilisé');
